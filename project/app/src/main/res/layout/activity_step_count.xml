@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/jibubackgroud"
+    tools:context="com.example.lenovo.test_sql.StepCountActivity">
+
+    <RelativeLayout
+        android:id="@+id/relative1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true">
+        <com.example.lenovo.test_sql.StepCount.UI.RoundProgressView
+            android:layout_width="250dp"
+            android:layout_height="250dp"
+            android:id="@+id/stepProgress" />
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_centerInParent="true">
+            <TextView
+                android:layout_height="wrap_content"
+                android:layout_width="wrap_content"
+                android:text="步数"
+                android:layout_centerHorizontal="true"
+                android:layout_alignTop="@+id/step"
+                />
+            <TextView
+                android:id="@+id/steps"
+                android:layout_height="wrap_content"
+                android:layout_width="wrap_content"
+                android:layout_margin="20dp"
+                android:text="0"
+                android:layout_gravity="center"
+                android:layout_centerInParent="true"
+                android:textSize="30sp" />
+            <TextView
+                android:id="@+id/dayGoal"
+                android:layout_height="wrap_content"
+                android:layout_width="wrap_content"
+                android:text="每日目标5000步"
+                />
+        </LinearLayout>
+    </RelativeLayout>
+    <TextView
+        android:id="@+id/distance"
+        android:layout_below="@id/relative1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="距离：0.00 公里"
+        android:layout_centerHorizontal="true"
+        android:textColor="#FFFF00"
+        android:textSize="30sp"/>
+    <TextView
+        android:id="@+id/kcal"
+        android:layout_below="@id/distance"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="消耗卡路里：0.00 kcal"
+        android:layout_marginTop="20dp"
+        android:layout_centerHorizontal="true"
+        android:textColor="#FFFF00"
+        android:textSize="30sp"/>
+    <Button
+        android:id="@+id/navigate"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/kcal"
+        android:layout_marginTop="20dp"
+        android:text="开始导航"
+        android:layout_centerHorizontal="true"
+        android:textSize="30sp"/>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#a0bbbbbb"
+        android:weightSum="1"
+        android:layout_alignParentBottom="true">
+        <ImageButton
+            android:layout_width="0dp"
+            android:layout_weight="0.25"
+            android:layout_height="50dp"
+            android:layout_margin="10dp"
+            android:background="@drawable/stepcount"
+            android:id="@+id/imageButtonStepCountMain" />
+
+        <ImageButton
+            android:layout_width="0dp"
+            android:layout_weight="0.25"
+            android:layout_height="50dp"
+            android:layout_margin="10dp"
+            android:background="@drawable/shequ"
+            android:id="@+id/imageButtonShequMain" />
+        <ImageButton
+            android:layout_width="0dp"
+            android:layout_weight="0.25"
+            android:layout_height="50dp"
+            android:layout_margin="10dp"
+            android:background="@drawable/calendar"
+            android:id="@+id/imageButtonCalendarMain" />
+        <ImageButton
+            android:layout_width="0dp"
+            android:layout_weight="0.25"
+            android:layout_height="50dp"
+            android:layout_margin="10dp"
+            android:background="@drawable/user"
+            android:id="@+id/UserMain" />
+    </LinearLayout>
+</RelativeLayout>
