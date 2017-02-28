@@ -1,397 +1,102 @@
+功能模块
 
+- 悦步主要分为三个模块：用户注册、计步、个人主页。
+- 用户注册：用户通过输入手机号码，获取短信发送的验证码，之后录入个人信息，完成个人信息的录入之后就可完成注册进行登录。
+- 计步：计步页面有圆形的自定义view显示当日步数统计。并且有导航显示，进入导航功能模块，能够记录运动路程轨迹并且能够查找地图元素。
+- 个人主页：该功能能够显示用户个人信息，并且能够更改个人信息。而且可以进入聊天机器人模块。
+- 聊天机器人，进入时会推送一条养生小知识。用户可与聊天机器人聊天，也可向聊天机器人查询食物和疾病（食物和疾病信息来自百度）
 
-（参考博客 http://www.jianshu.com/p/5d57f7fd84fa）
-##计步功能
-###文件结构
-![这里写图片描述](http://img.blog.csdn.net/20170228214352074?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvcWF6d3lj/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast)
-###思路框图
-![这里写图片描述](http://img.blog.csdn.net/20170228213936544?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvcWF6d3lj/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast)
-###代码
-（项目源代码
-+ StepCountActivity
+技术说明
 
-在onCreate方法中初始化Handler，onStart方法中开启服务，以备退到后台，再到前台，会触发onStart方法，以此来开启service。
-```
-	@Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_step_count);
-
-        init();
-    }
-    
-    private void init() {
-	    ...
-	    //
-        delayHandler = new Handler(this);
-        ...
-    }
-    @Override
-    protected void onStart() {
-        super.onStart();
-        setupService();
-    }
-
-    private void setupService() {
-        Intent intent = new Intent(this, StepService.class);
-        bindService(intent, conn, Context.BIND_AUTO_CREATE);
-        startService(intent);
-	}
-	
-	@Override
-    protected void onPause(){
-        //请求更新步数
-        delayHandler.sendEmptyMessage(Constant.REQUEST_SERVER);
-        super.onPause();
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        unbindService(conn);
-    }
-```
-以bind形式开启service，故有ServiceConnection接收回调。
-
-```
-    ServiceConnection conn = new ServiceConnection() {
-        @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            try {
-                messenger = new Messenger(service);
-                Message msg = Message.obtain(null, Constant.MSG_FROM_CLIENT);
-                msg.replyTo = mGetReplyMessenger;
-                messenger.send(msg);
-            } catch (RemoteException e) {
-                e.printStackTrace();
-            }
-        }
-        @Override
-        public void onServiceDisconnected(ComponentName name) {
-        }
-    };
-```
-接收从服务端回调的步数
-
-```
-    @Override
-    public boolean handleMessage(Message msg) {
-        switch (msg.what) {
-            case Constant.MSG_FROM_SERVER:
-                ...
-                delayHandler.sendEmptyMessageDelayed(Constant.REQUEST_SERVER, TIME_INTERVAL);
-                break;
-            case Constant.REQUEST_SERVER:
-                try {
-                    Message msg1 = Message.obtain(null, Constant.MSG_FROM_CLIENT);
-                    msg1.replyTo = mGetReplyMessenger;
-                    messenger.send(msg1);
-                } catch (RemoteException e) {
-                    e.printStackTrace();
-                }
-                break;
-        }
-        return false;
-    }
-```
-
-+ StepService
-
-有一个Handler，负责与StepCountActivity进行通讯
-
-```
-    private static class MessenerHandler extends Handler {
-        @Override
-        public void handleMessage(Message msg) {
-            switch (msg.what) {
-                case Constant.MSG_FROM_CLIENT:
-                    try {
-                        Messenger messenger = msg.replyTo;
-                        Message replyMsg = Message.obtain(null, Constant.MSG_FROM_SERVER);
-                        Bundle bundle = new Bundle();
-                        bundle.putInt("step", StepDcretor.CURRENT_STEP);
-                        save();
-                        replyMsg.setData(bundle);
-                        messenger.send(replyMsg);
-                    } catch (RemoteException e) {
-                        e.printStackTrace();
-                    }
-                    break;
-                default:
-                    super.handleMessage(msg);
-            }
-        }
-    }
-```
-onCreate方法注册关屏、开屏等广播。开启一个线程，执行计步逻辑。同时开启一个计时器，30s往数据库中写入一次数据
-```
-    @Override
-    public void onCreate() {
-        super.onCreate();
-        initBroadcastReceiver();
-        new Thread(new Runnable() {
-            public void run() {
-                startStepDetector();
-            }
-        }).start();
-        startTimeCount();
-    }
-```
-在注册的广播中，会根据用户是在前台还是后台，对存储时间也是有改变的
-```
-    private void initBroadcastReceiver() {
-        final IntentFilter filter = new IntentFilter();
-        // 屏幕灭屏广播
-        filter.addAction(Intent.ACTION_SCREEN_OFF);
-        //日期修改
-        filter.addAction(Intent.ACTION_TIME_CHANGED);
-        //关机广播
-        filter.addAction(Intent.ACTION_SHUTDOWN);
-        // 屏幕亮屏广播
-        filter.addAction(Intent.ACTION_SCREEN_ON);
-        // 屏幕解锁广播
-        filter.addAction(Intent.ACTION_USER_PRESENT);
-        // 当长按电源键弹出“关机”对话或者锁屏时系统会发出这个广播
-        // example：有时候会用到系统对话框，权限可能很高，会覆盖在锁屏界面或者“关机”对话框之上，
-        // 所以监听这个广播，当收到时就隐藏自己的对话，如点击pad右下角部分弹出的对话框
-        filter.addAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS);
-
-        mBatInfoReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(final Context context, final Intent intent) {
-                String action = intent.getAction();
-
-                if (Intent.ACTION_SCREEN_ON.equals(action)) {
-                    Log.v(TAG, "screen on");
-                } else if (Intent.ACTION_SCREEN_OFF.equals(action)) {
-                    Log.v(TAG, "screen off");
-                    //改为60秒一存储
-                    duration = 60000;
-                } else if (Intent.ACTION_USER_PRESENT.equals(action)) {
-                    Log.v(TAG, "screen unlock");
-                    save();
-                    //改为30秒一存储
-                    duration = 30000;
-                } else if (Intent.ACTION_CLOSE_SYSTEM_DIALOGS.equals(intent.getAction())) {
-                    Log.v(TAG, " receive Intent.ACTION_CLOSE_SYSTEM_DIALOGS");
-                    //保存一次
-                    save();
-                } else if (Intent.ACTION_SHUTDOWN.equals(intent.getAction())) {
-                    Log.v(TAG, " receive ACTION_SHUTDOWN");
-                    save();
-                } else if (Intent.ACTION_TIME_CHANGED.equals(intent.getAction())) {
-                    Log.v(TAG, " receive ACTION_TIME_CHANGED");
-                    initTodayData();
-                    clearStepData();
-                }
-            }
-        };
-        registerReceiver(mBatInfoReceiver, filter);
-    }
-```
-在onStartComand中，从数据库中初始化今日步数，并更新通知栏
-```
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        initTodayData();
-        updateNotification("今日步数：" + StepDcretor.CURRENT_STEP + " 步");
-        return START_STICKY;
-    }
-```
-同时开启Google内置计步器和加速度传感器
-
-```
-    private void startStepDetector() {
-        if (sensorManager != null && stepDetector != null) {
-            sensorManager.unregisterListener(stepDetector);
-            sensorManager = null;
-            stepDetector = null;
-        }
-        sensorManager = (SensorManager) this
-                .getSystemService(SENSOR_SERVICE);
-        getLock(this);
-
-        addBasePedoListener();
-        addCountStepListener();
-    }
-```
-
-+ StepDcretor
-
-实现了SensorEventListener接口,
-```
-public void onSensorChanged(SensorEvent event) {
-    Sensor sensor = event.sensor; 
-   synchronized (this) {
-        if (sensor.getType() == Sensor.TYPE_ACCELEROMETER) {  
-          calc_step(event);       
-         }   
-    }
-}
-```
-calc_step方法算出加速度传感器的x、y、z三轴的平均数值（为了平衡在某一个方向数值过大造成的数据误差），接着交给DetectorNewStep方法处理。
-
-```
-    synchronized private void calc_step(SensorEvent event) {
-        average = (float) Math.sqrt(Math.pow(event.values[0], 2)
-                + Math.pow(event.values[1], 2) + Math.pow(event.values[2], 2));
-        detectorNewStep(average);
-    }
-```
-针对波峰和波谷，进行检测
-
-```
-    /*
-     * 检测步子，并开始计步
-	 * 1.传入sersor中的数据
-	 * 2.如果检测到了波峰，并且符合时间差以及阈值的条件，则判定为1步
-	 * 3.符合时间差条件，波峰波谷差值大于initialValue，则将该差值纳入阈值的计算中
-	 * */
-    public void detectorNewStep(float values) {
-        if (gravityOld == 0) {
-            gravityOld = values;
-        } else {
-            if (DetectorPeak(values, gravityOld)) {
-                timeOfLastPeak = timeOfThisPeak;
-                timeOfNow = System.currentTimeMillis();
-
-                if (timeOfNow - timeOfLastPeak >= 200
-                        && (peakOfWave - valleyOfWave >= ThreadValue) && (timeOfNow - timeOfLastPeak) <= 2000) {
-                    timeOfThisPeak = timeOfNow;
-                    //更新界面的处理，不涉及到算法
-                    preStep();
-                }
-                if (timeOfNow - timeOfLastPeak >= 200
-                        && (peakOfWave - valleyOfWave >= initialValue)) {
-                    timeOfThisPeak = timeOfNow;
-                    ThreadValue = Peak_Valley_Thread(peakOfWave - valleyOfWave);
-                }
-            }
-        }
-        gravityOld = values;
-    }
-
-```
-通过变量CountTimeState，将计步分为了三种模式，CountTimeState=0时代表还未开启计步器。CountTimeState=1时代表预处理模式，若TEMP\_STEP步数如果在规定的时间内一直在增加，那么TEMP\_STEP值有效，反之，无效舍弃，目的是为了过滤掉一些手机晃动带来的影响。CountTimeState=2时代表正常计步模式
-
-```
-    private void preStep() {
-        if (CountTimeState == 0) {
-            // 开启计时器
-            time = new TimeCount(duration, 700);
-            time.start();
-            CountTimeState = 1;
-            Log.v(TAG, "开启计时器");
-        } else if (CountTimeState == 1) {
-            TEMP_STEP++;
-            Log.v(TAG, "计步中 TEMP_STEP:" + TEMP_STEP);
-        } else if (CountTimeState == 2) {
-            CURRENT_STEP++;
-            if (onSensorChangeListener != null) {
-                onSensorChangeListener.onChange();
-            }
-        }
-    }
-```
-检测波峰
-
-```
-    /*
-     * 检测波峰
-     * 以下四个条件判断为波峰：
-     * 1.目前点为下降的趋势：isDirectionUp为false
-     * 2.之前的点为上升的趋势：lastStatus为true
-     * 3.到波峰为止，持续上升大于等于2次
-     * 4.波峰值大于1.2g,小于2g
-     * 记录波谷值
-     * 1.观察波形图，可以发现在出现步子的地方，波谷的下一个就是波峰，有比较明显的特征以及差值
-     * 2.所以要记录每次的波谷值，为了和下次的波峰做对比
-     * */
-    public boolean DetectorPeak(float newValue, float oldValue) {
-        lastStatus = isDirectionUp;
-        if (newValue >= oldValue) {
-            isDirectionUp = true;
-            continueUpCount++;
-        } else {
-            continueUpFormerCount = continueUpCount;
-            continueUpCount = 0;
-            isDirectionUp = false;
-        }
-
-        //Log.v(TAG, "oldValue:" + oldValue);
-        if (!isDirectionUp && lastStatus
-                && (continueUpFormerCount >= 2 && (oldValue >= minValue && oldValue < maxValue))) {
-            peakOfWave = oldValue;
-            return true;
-        } else if (!lastStatus && isDirectionUp) {
-            valleyOfWave = oldValue;
-            return false;
-        } else {
-            return false;
-        }
-    }
-
-```
-动态生成阈值，阈值是为了跟波峰与波谷的差值进行比较，进而判断是否为1步
-
-```
-    /*
-     * 阈值的计算
-     * 1.通过波峰波谷的差值计算阈值
-     * 2.记录4个值，存入tempValue[]数组中
-     * 3.在将数组传入函数averageValue中计算阈值
-     * */
-    public float Peak_Valley_Thread(float value) {
-        float tempThread = ThreadValue;
-        if (tempCount < valueNum) {
-            tempValue[tempCount] = value;
-            tempCount++;
-        } else {
-            tempThread = averageValue(tempValue, valueNum);
-            for (int i = 1; i < valueNum; i++) {
-                tempValue[i - 1] = tempValue[i];
-            }
-            tempValue[valueNum - 1] = value;
-        }
-        return tempThread;
-
-    }
-```
-将阈值进行梯度化，取4组数值，进行梯度化，梯度化的数值是大量测试试出来的
-
-```
-    /*
-     * 梯度化阈值
-     * 1.计算数组的均值
-     * 2.通过均值将阈值梯度化在一个范围里
-     * */
-    public float averageValue(float value[], int n) {
-        float ave = 0;
-        for (int i = 0; i < n; i++) {
-            ave += value[i];
-        }
-        ave = ave / valueNum;
-        if (ave >= 8) {
-            Log.v(TAG, "超过8");
-            ave = (float) 4.3;
-        } else if (ave >= 7 && ave < 8) {
-            Log.v(TAG, "7-8");
-            ave = (float) 3.3;
-        } else if (ave >= 4 && ave < 7) {
-            Log.v(TAG, "4-7");
-            ave = (float) 2.3;
-        } else if (ave >= 3 && ave < 4) {
-            Log.v(TAG, "3-4");
-            ave = (float) 2.0;
-        } else {
-            Log.v(TAG, "else");
-            ave = (float) 1.7;
-        }
-        return ave;
-    }
-```
-
-
-
-
-
+- 注册登录
+  - 使用安卓自带SQLite数据库储存用户信息，继承自SQLiteOpenHelper
+  - 登陆注册页面使用Mob平台提供的SMSSDK用来发送短信验证手机号
+  - 通过判断cursor.getCount()是否为0判断手机号是否已被注册
+  - 登陆或注册成功后使登录状态为true，通过将用户名加入SharedPreferences
+  - 通过依次判断两个cursor，一个使用用户名查询，另一个使用手机号查询，实现可以通过用户名或手机号登陆
+- 用户界面
+  - 使用ListView显示用户信息，SimpleAdapter填充
+  - 使用一般公式计算BMI和标准体重一并显示
+  - 点击列表项弹出AlertDialog，自定义样式（一个输入框），可修改对应信息
+- 计步
+  - LiteOrm：一个开放轻便高效数据库，用于每日步数的存储和频繁更新，每个记录包含自增主键、当日日期、当日步数
+  - 定时器: 使用synchronized使一次只能有一个线程进入起始函数start()
+  - 开机完成自动启动计步服务：使用BroadcastReceiver接收开机完成广播
+  - 检测步数
+    - 倒计时3.5秒，3.5秒内不会显示计步，用于屏蔽细微波动，未停止则正常计步，开启定时器每2s检测一次是否停止计步
+    - 检测波峰的判断条件
+      1. 目前点为下降的趋势：isDirectionUp为false
+      2. 之前的点为上升的趋势：lastStatus为true
+      3. 到波峰为止，持续上升大于等于2次
+      4. 波峰值大于1.2g,小于2g
+    - 记录波谷值
+      1. 观察波形图，可以发现在出现步子的地方，波谷的下一个就是波峰，有比较明显的特征以及差值
+      2. 要记录每次的波谷值，为了和下次的波峰做对比
+    - 阈值的计算
+      1. 通过波峰波谷的差值计算阈值
+      2. 记录4个值，存入tempValue[]数组中
+      3. 将数组进行梯度化阈值计算阈值
+    - 梯度化阈值
+      1. 计算数组的均值
+      2. 通过均值将阈值梯度化在一个范围里
+      3. 取4组数值，进行梯度化，根据测试数据
+    - 检测步子
+      1. 传入sersor中的数据
+      2. 如果检测到了波峰，并且符合时间差以及阈值的条件，则判定为1步
+      3. 符合时间差条件，波峰波谷差值大于initialValue，则将该差值纳入阈值的计算中
+  - 计步服务Service
+    - onBind：返回IBinder
+    - Handler：与StepCountActivity通信
+    - Bundle: 封装当前步数
+    - Messenger: 发送
+    - Thread、Runnable：开启新线程进行计步
+    - 开启Google内置计步器和加速度传感器
+    - Notification：在通知栏显示并更新步数，setOngoing(true)设置不可清除
+    - IntentFilter，addAction()，BroadCastReceiver: 动态接受系统广播，根据亮屏、关屏等动态修改保存数据的时间间隔
+    - 保存数据：判断数据库当天记录是否为空，空则insert，非空则update
+    - Wake Lock: 控制休眠时间
+  - RoundProgressView：自定义圆形进度条
+    - Paint、Canvas：画出层次圆，通过角度表示进度
+  - StepCountActivity：计步页面
+    - ServiceConnection()：连接计步服务
+    - bindService、startService: 混合绑定开启服务
+    - Handler：每个0.5s请求一次步数并使用RoundProgressView显示当前步数/目标步数
+    - 一般公式：通过步数粗略计算路程和消耗卡路里
+- 地图与定位跟踪
+  - 百度地图sdk
+  - 地磁和加速度传感器：显示朝向
+  - 百度POISearch：根据关键词匹配，范围定为以用户位置为中心方圆10000米
+  - 百度Marker: 搜索结果在地图上进行标记A到J
+  - Class drawable，getField(imageName)：通过图片(如在drawable下)的名称取得其id
+  - 百度InfoWindow：点击marker显示出该地点的简要信息
+  - 百度BDLocationListener：百度定位监听器，每当位置改变，使用onChange可得到当前位置信息
+  - 百度地图线段类Overlay：每次位置改变记录该位置点，并用线依次连接，以模拟用户行走轨迹，同时计算每段距离相加即为行走的路程
+  - Chronometer：计时器，点击开始后记录运动时长
+- 聊天机器人
+  - Spanned：兼容html文本和普通文本
+  - Textview的autolink：允许文本中的链接
+  - ListView：实现聊天界面
+  - ChatMsgEntity：自定义的消息类型，包含昵称、时间、发送还是接收标志
+  - 自定义ChatMsgViewAdapter: 每一项判断是（我）发送消息还是（他）接受消息，分别对应两个xml文件，一左一右
+  - api：图灵机器人api（智能对话），健康百科api，百度api（健康食品、疾病查询）
+  - HTTP连接（Get、Post）：四个url分为get和post两种方式获取响应
+  - Json解析：返回的内容都为json格式，需从中提取有用信息
+  - Handler、Message：使用message.what区分四个功能，从而在handleMessage中做不同的json解析
+- 优化
+  - 用户操作体验
+    - 用户注册后无需重新登陆，可直接进入计步界面
+    - 用户可使用用户名或手机号登陆
+    - 用户在用户信息界面可直接修改信息，方便易用
+    - 没有复杂的图表，用户只需查看推荐体重、BMI即可知晓身体健康情况和努力的目标
+    - 计步无需保持应用开启，只需在后台运行服务即可通过通知栏快速查看当前步数，点击通知栏也可快捷进入应用
+    - 用户在与智能聊天机器人对话时可以方便、快速地查询食品健康信息和疾病信息（病因、用药）
+    - 用户在获得查询结果时若有链接可以直接点开进入浏览器查看详情
+  - 应用的运行速度，稳定性，鲁棒性等
+    - 对更新频繁的步数，不使用安卓自带SQLite，而是LiteOrm,体积更轻，速度更快
+    - 根据系统广播，如关屏、亮屏等决定不同的更新、保存步数的速率，以便在满足用户需求的情况下减少资源占用
+    - 经过调试已经基本避免了因service或百度地图闪退的情况
+  - 优化了代码结构
+    - 对四个url的http请求，通过增加传入参数（url、apikey）合并到两种情况get和post，而不是每个url一个函数，具有更好的可扩展性，不会因为新增url使代码需要较大变动
+    - 通过Message.what区分url，在Handle中分情况处理，使代码更易理解
+    - SQLite查询中，由于每次需要的参数都不同，但是每次返回该记录所有列又会浪费，故使用String数组存储所有需返回的数据，无需重复定义函数，减少了代码规模而不失易读性
+    - 按功能将文件分类，如计步相关的文件放入StepCount文件夹，再细分为Constant、UI等
