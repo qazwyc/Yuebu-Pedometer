@@ -117,15 +117,17 @@ public class NavigateActivity extends AppCompatActivity {
         mBaiduMap = mMapView.getMap();
         //普通地图
         mBaiduMap.setMapType(BaiduMap.MAP_TYPE_NORMAL);
-
+        
+        //设置定位及其图标
         Bitmap bitmap = Bitmap.createScaledBitmap(BitmapFactory.decodeResource(getResources(),R.mipmap.pointer),100,100,true);
         BitmapDescriptor bitmapDescriptor = BitmapDescriptorFactory.fromBitmap(bitmap);
         MyLocationConfiguration config = new MyLocationConfiguration(MyLocationConfiguration.LocationMode.NORMAL,true,bitmapDescriptor);
         mBaiduMap.setMyLocationEnabled(true);
         mBaiduMap.setMyLocationConfigeration(config);
-
+        
+        //定位按钮
         mToggleButton = (ToggleButton) findViewById(R.id.button_center);
-
+        
         mLocationClient = new LocationClient(getApplicationContext());     //声明LocationClient类
         mLocationClient.registerLocationListener( myListener );    //注册监听函数
         initLocation();
