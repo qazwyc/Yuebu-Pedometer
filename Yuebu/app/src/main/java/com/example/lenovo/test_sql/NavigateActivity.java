@@ -394,9 +394,11 @@ public class NavigateActivity extends AppCompatActivity {
             float[] R = new float[9];
             float[] values = new float[3];
             if(accValues != null && magValues != null){
+                //计算朝向
                 SensorManager.getRotationMatrix(R, null, accValues, magValues);
                 SensorManager.getOrientation(R, values);
                 mCurrentRotation = (float) Math.round(Math.toDegrees(values[0])*100)/100;
+                //更新
                 if(MyLatLng!=null){
                     MyLocationData.Builder builder = new MyLocationData.Builder()
                             .direction(mCurrentRotation)
